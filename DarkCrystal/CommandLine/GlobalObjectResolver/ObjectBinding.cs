@@ -3,6 +3,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System;
+using System.Linq.Expressions;
 
 namespace DarkCrystal.CommandLine
 {
@@ -19,7 +20,7 @@ namespace DarkCrystal.CommandLine
             this.Value = value;
         }
         
-        public SyntaxObject GetSyntaxObject(Token token, bool fakeExecution)
+        public SyntaxObject GetSyntaxObject(Token token)
         {
             switch (BindType)
             {
@@ -27,11 +28,16 @@ namespace DarkCrystal.CommandLine
                     return new Class(Type, token);
 
                 case BindType.Value:
-                    return new Value(Type, fakeExecution ? null : Value, token);
+                    return new Value(Type, Value, token);
 
                 case BindType.ValueGetter:
-                    var value = fakeExecution ? null : ((Func<object>)Value)();
-                    return new Value(Type, value, token);
+                    return new Value(Type, (Expression)Value, token);
+
+                case BindType.Namespace:
+                    return Value as Namespace;
+
+                case BindType.Argument:
+                    return new Value(Type, Value as Expression, token);
                     
                 default:
                     throw new Exception("Unknown bind type");

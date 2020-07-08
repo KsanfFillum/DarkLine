@@ -3,77 +3,178 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System;
-using System.Reflection;
+using System.Collections.Generic;
+using System.Linq.Expressions;
+using System.Text;
 
 namespace DarkCrystal.CommandLine
 {
-    public class Function : SyntaxObject
+    public partial class Function : SyntaxObject
     {
-        private MethodInfo MethodInfo;
-        private object Instance;
+        private Type CollerType;
+        private string FunctionSignature;
+        private Cache.MethodInfoData MethodInfo;
+        private Expression FuncExpression;
+        private Expression Caller;
 
-        public Function(MethodInfo methodInfo, object instance, Token token) : base(token)
+        public Function(string signature, Type collerType, Expression caller, Token token) : base(token)
         {
-            this.Instance = instance;
-            this.MethodInfo = methodInfo;
+            this.CollerType = collerType;
+            this.FunctionSignature = signature;
+            this.Caller = caller;
         }
 
-        public Value Call(Value[] arguments, CommandLine commandLine)
+        public void FinalizeFunction(Value[] arguments)
         {
-            CheckTypes(arguments);
-
-            if (commandLine.FakeExecution)
+            int bestScore = int.MaxValue;
+            foreach (var method in Cache.GetFor(CollerType, FunctionSignature))
             {
-                return new Value(MethodInfo.ReturnType, null, Token);
+                var parameters = method.MethodInfo.GetParameters().ToList();
+                if (method.IsExtension)
+                {
+                    parameters.RemoveAt(0);
+                }
+
+                int convertationScore = 0;
+                if (arguments.Length > parameters.Count)
+                {
+                    continue;
+                }
+
+                if (parameters.Count != arguments.Length)
+                {
+                    if (parameters[arguments.Length].IsOptional)
+                    {
+                        convertationScore += 64;
+                    }
+                    else
+                    {
+                        continue;
+                    }
+                }
+
+                int i = -1;
+                bool invalid = false;
+
+                while (++i < arguments.Length)
+                {
+                    if (parameters[i].ParameterType.IsGenericParameter)
+                    {
+                        if (!arguments[i].Type.MeetTheConstraints(parameters[i].ParameterType))
+                        {
+                            invalid = true;
+                            break;
+                        }
+                    }
+                    else if (parameters[i].ParameterType == arguments[i].Type)
+                    {
+                    }
+                    else if (arguments[i].Type.IsCastableTo(parameters[i].ParameterType))
+                    {
+                        ++convertationScore;
+                    }
+                    else
+                    {
+                        invalid = true;
+                        break;
+                    }
+                }
+
+                if (invalid)
+                {
+                    continue;
+                }
+
+                if (bestScore > convertationScore)
+                {
+                    bestScore = convertationScore;
+                    if (method.MethodInfo.IsGenericMethodDefinition)
+                    {
+                        var genericType = new Dictionary<Type, Type>();
+                        foreach (var param in parameters)
+                        {
+                            if (param.ParameterType.IsGenericParameter)
+                            {
+                                genericType[param.ParameterType] = arguments[param.Position].Type;
+                            }
+                        }
+
+                        MethodInfo = new Cache.MethodInfoData(
+                            method.MethodInfo.MakeGenericMethod(
+                                method.MethodInfo.GetGenericArguments().ConvertCollection(g => genericType[g]).ToArray()),
+                            method.IsExtension);
+
+                    }
+                    else
+                    {
+                        MethodInfo = method;
+                    }
+
+                    if (convertationScore == 0)
+                    {
+                        break;
+                    }
+                    continue;
+                }
+            }
+
+            if (MethodInfo.MethodInfo == null)
+            {
+                StringBuilder builder = new StringBuilder("There are no function with given signature. Candidates:");
+                builder.AppendLine();
+                foreach (var function in Cache.GetFor(CollerType, FunctionSignature))
+                {
+                    builder.AppendLine(function.MethodInfo.ToString());
+                }
+
+                throw new TokenException(builder.ToString(), Token);
+            }
+
+            var @params = MethodInfo.MethodInfo.GetParameters();
+            Expression[] args = new Expression[@params.Length];
+            int counter = 0;
+            if (MethodInfo.IsExtension)
+            {
+                args[counter++] = Caller;
+                for (; counter < arguments.Length + 1; counter++)
+                {
+                    args[counter] = TypeCache.Cast(arguments[counter - 1].ValueExpression, @params[counter].ParameterType);
+                }
+
+                for (; counter < @params.Length; counter++)
+                {
+                    args[counter] = Expression.Constant(@params[counter].DefaultValue);
+                }
+                this.FuncExpression = Expression.Call(MethodInfo.MethodInfo, args).ReduceIfPossible();
             }
             else
             {
-                var objectArguments = new object[arguments.Length];
-                for (int i = 0; i < arguments.Length; i++)
+                for (; counter < arguments.Length; counter++)
                 {
-                    objectArguments[i] = arguments[i].Get();
+                    args[counter] = TypeCache.Cast(arguments[counter].ValueExpression, @params[counter].ParameterType);
                 }
-                var result = MethodInfo.Invoke(Instance, objectArguments);
-                return new Value(MethodInfo.ReturnType, result, Token);
+
+                for (; counter < @params.Length; counter++)
+                {
+                    args[counter] = Expression.Constant(@params[counter].DefaultValue);
+                }
+            }
+
+            if (MethodInfo.MethodInfo.IsStatic)
+            {
+                this.FuncExpression = Expression.Call(MethodInfo.MethodInfo, args).ReduceIfPossible();
+            }
+            else
+            {
+                this.FuncExpression = Expression.Call(Caller, MethodInfo.MethodInfo, args).ReduceIfPossible();
             }
         }
 
-        public Type[] GetArgumentTypes()
-        {
-            var parameters = MethodInfo.GetParameters();
-            var argumentTypes = new Type[parameters.Length];
-            for (int i = 0; i < parameters.Length; i++)
-            {
-                argumentTypes[i] = parameters[i].ParameterType;
-            }
-            return argumentTypes;
-        }
+        public override Value GetValue() => new Value(MethodInfo.MethodInfo.ReturnType, FuncExpression, Token);
 
         public override string ToString()
         {
-            return String.Format("Function '{0}'", MethodInfo.Name);
-        }
-
-        private void CheckTypes(Value[] arguments)
-        {
-            var parameters = MethodInfo.GetParameters();
-            var count = Math.Min(parameters.Length, arguments.Length);
-            for (int i = 0; i < count; i++)
-            {
-                var argument = arguments[i];
-                var parameterType = parameters[i].ParameterType;
-                if (!CommandLine.EnsureType(argument, parameterType))
-                {
-                    var format = "Parameter {0} of function {1} expects type {2}, got {3}";
-                    throw new TokenException(String.Format(format, i + 1, MethodInfo.Name, parameterType.Name, argument.Type.Name), Token);
-                }
-            }
-
-            if (parameters.Length != arguments.Length)
-            {
-                var format = "Function {0} expects {1} parameters, got {2}";
-                throw new TokenException(String.Format(format, MethodInfo.Name, parameters.Length, arguments.Length), Token);
-            }
+            return String.Format("Function '{0}'", MethodInfo.MethodInfo?.Name ?? ("Unfinished " + FunctionSignature));
         }
     }
 }

@@ -16,6 +16,8 @@ namespace DarkCrystal.CommandLine
         Operator,
         AssignmentOperator,
         EndOfLine,
-        Autocomplete
+        Autocomplete,
+        OpenAccessorBracket,
+        ClosedAccessorBracket
     }
 }

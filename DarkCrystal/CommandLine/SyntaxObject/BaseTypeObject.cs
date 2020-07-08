@@ -3,6 +3,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System;
+using System.Linq.Expressions;
 using System.Reflection;
 
 namespace DarkCrystal.CommandLine
@@ -12,7 +13,7 @@ namespace DarkCrystal.CommandLine
         public Type Type { get; protected set; }
 
         protected abstract BindingFlags Flags { get; }
-        protected abstract object Instance { get; }
+        protected abstract Expression Instance { get; }
         
         public BaseTypeObject(Type valueType, Token token) : base(token)
         {
@@ -34,10 +35,9 @@ namespace DarkCrystal.CommandLine
                 return new Property(fieldInfo, Instance, token);
             }
 
-            var memberInfo = Type.GetMethod(memberName, Flags);
-            if (memberInfo != null)
+            foreach (var _ in Function.Cache.GetFor(Type, memberName))
             {
-                return new Function(memberInfo, Instance, token);
+                return new Function(memberName, Type, Instance, token);
             }
 
             return base.GetMember(token);
@@ -54,24 +54,24 @@ namespace DarkCrystal.CommandLine
                 }
             }
 
-            // methods
-            if (!Type.IsEnum)
-            {
-                foreach (var method in Type.GetMethods(Flags))
-                {
-                    if (!method.IsSpecialName && !method.IsGenericMethod && method.Name.StartsWith(startText))
-                    {
-                        return method.Name;
-                    }
-                }
-            }
-
             // properties
             foreach (var propetry in Type.GetProperties(Flags))
             {
                 if (!propetry.IsSpecialName && propetry.Name.StartsWith(startText))
                 {
                     return propetry.Name;
+                }
+            }
+
+            // methods
+            if (!Type.IsEnum)
+            {
+                foreach (var method in Function.Cache.GetFor(Type))
+                {
+                    if (!method.MethodInfo.IsSpecialName && method.MethodInfo.Name.StartsWith(startText))
+                    {
+                        return method.MethodInfo.Name;
+                    }
                 }
             }
 

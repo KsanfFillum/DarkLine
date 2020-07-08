@@ -2,14 +2,10 @@
 // Copyright (c) Dark Crystal Games. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-namespace DarkCrystal.CommandLine
+namespace DarkCrystal
 {
-    public enum BindType
+    public class TypeHash<T>
     {
-        Class,
-        Value,
-        ValueGetter,
-        Namespace,
-        Argument
+        public static readonly int Hash = typeof(T).GetHashCode();
     }
 }

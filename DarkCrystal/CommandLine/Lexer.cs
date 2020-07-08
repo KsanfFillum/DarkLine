@@ -42,15 +42,15 @@ namespace DarkCrystal.CommandLine
                         }
                     }
                     var tokenText = line.Substring(si, i - si);
-                    if (tokenText.ToLower() == "true")
+                    if (tokenText.ToLowerInvariant() == "true")
                     {
                         token = ValueToken(si, i - si, true);
                     }
-                    else if (tokenText.ToLower() == "false")
+                    else if (tokenText.ToLowerInvariant() == "false")
                     {
                         token = ValueToken(si, i - si, false);
                     }
-                    else if (tokenText.ToLower() == "null")
+                    else if (tokenText.ToLowerInvariant() == "null")
                     {
                         token = ValueToken(si, i - si, null);
                     }
@@ -134,10 +134,13 @@ namespace DarkCrystal.CommandLine
                     }
                     else
                     {
-                        float number;
-                        if (Single.TryParse(tokenText, NumberStyles.Any, CultureInfo.InvariantCulture, out number))
+                        if (Int32.TryParse(tokenText, out var intNum))
                         {
-                            token = ValueToken(si, i - si, number);
+                            token = ValueToken(si, i - si, intNum);
+                        }
+                        else if (Single.TryParse(tokenText, NumberStyles.Any, CultureInfo.InvariantCulture, out var floatNum))
+                        {
+                            token = ValueToken(si, i - si, floatNum);
                         }
                         else
                         {
@@ -184,6 +187,16 @@ namespace DarkCrystal.CommandLine
                 else if (c.Equals(')'))
                 {
                     token = new Token(TokenType.ClosedBracket, i, 1);
+                    i++;
+                }
+                else if (c.Equals('['))
+                {
+                    token = new Token(TokenType.OpenAccessorBracket, i, 1);
+                    i++;
+                }
+                else if (c.Equals(']'))
+                {
+                    token = new Token(TokenType.ClosedAccessorBracket, i, 1);
                     i++;
                 }
                 else if (c.Equals(','))

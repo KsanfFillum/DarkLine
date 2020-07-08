@@ -3,50 +3,41 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System;
+using System.Linq.Expressions;
 using System.Reflection;
 
 namespace DarkCrystal.CommandLine
 {
     public class Property : SyntaxObject
     {
+        private Expression MemberExpression;
         private Type PropertyType;
-        private object Instance;
-        
-        private Func<object> Getter;
-        private Action<object> Setter;
         private string PropertyName;
-        private bool IsStatic;
-        
-        public Property(PropertyInfo propertyInfo, object instance, Token token) : base(token)
+
+        public Property(PropertyInfo propertyInfo, Expression holder, Token token) : base(token)
         {
-            this.Instance = instance;
+            this.MemberExpression = Expression.Property(holder, propertyInfo).ReduceIfPossible();
             this.PropertyType = propertyInfo.PropertyType;
-            this.Getter = () => propertyInfo.GetValue(instance);
-            this.Setter = (value) => propertyInfo.SetValue(instance, value);
             this.PropertyName = propertyInfo.Name;
-            this.IsStatic = propertyInfo.GetAccessors(true)[0].IsStatic;
         }
 
-        public Property(FieldInfo fieldInfo, object instance, Token token) : base(token)
+        public Property(FieldInfo fieldInfo, Expression holder, Token token) : base(token)
         {
-            this.Instance = instance;
+            this.MemberExpression = Expression.Field(holder, fieldInfo).ReduceIfPossible();
             this.PropertyType = fieldInfo.FieldType;
-            this.Getter = () => fieldInfo.GetValue(instance);
-            this.Setter = (value) => fieldInfo.SetValue(instance, value);
             this.PropertyName = fieldInfo.Name;
-            this.IsStatic = fieldInfo.IsStatic;
+        }
+
+        public Property(Expression memberExpression, Token token) : base(token)
+        {
+            this.MemberExpression = memberExpression;
+            this.PropertyType = memberExpression.Type;
+            this.PropertyName = "Special Property";
         }
 
         public override Value GetValue()
         {
-            if (!IsStatic && Instance == null)
-            {
-                return new Value(PropertyType, null, Token);
-            }
-            else
-            {
-                return new Value(PropertyType, Getter(), Token);
-            }
+            return new Value(PropertyType, MemberExpression, Token);
         }
 
         public override SyntaxObject GetMember(Token token)
@@ -57,23 +48,6 @@ namespace DarkCrystal.CommandLine
         public override string AutoCompleteMember(string startText)
         {
             return GetValue().AutoCompleteMember(startText);
-        }
-
-        public Value SetValue(Value value, bool fakeExecution)
-        {
-            if (!CommandLine.EnsureType(value, PropertyType))
-            {
-                var format = "Assignment expects {0} got {1}";
-                var message = String.Format(format, PropertyType.Name, value.Type.Name);
-                throw new TokenException(message, Token);
-            }
-
-            if (!fakeExecution)
-            {
-                Setter(value.Get());
-            }
-
-            return value;
         }
 
         public override string ToString()

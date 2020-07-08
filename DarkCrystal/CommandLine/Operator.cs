@@ -4,64 +4,51 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq.Expressions;
 
 namespace DarkCrystal.CommandLine
 {
     public class Operator
     {
-        public delegate object HandlerType(object a, object b);
+        public delegate Expression HandlerType(Expression a, Expression b);
 
         private static Dictionary<string, Operator> Operators;
-
-        public string Name { get; protected set; }
-        public HandlerType Handler { get; protected set; }
+        public string Name { get; private set; }
+        public HandlerType Handler { get; private set; }
         public int Priority { get; private set; }
-        public Type ArgumentType1 { get; protected set; }
-        public Type ArgumentType2 { get; protected set; }
-        public Type ResultType { get; protected set; }
+        public Type ArgumentType1 { get; private set; }
+        public Type ArgumentType2 { get; private set; }
+        public Type ResultType { get; private set; }
 
         static Operator()
         {
             Operators = new Dictionary<string, Operator>();
             int priority = 0;
-            AddOperator<object, object, object>("=", null, priority);
+            AddOperator<object, object, object>("=", Expression.Assign, priority);
             priority++;
-            AddOperator<bool, bool, bool>("||", LogicalOr, priority);
+            AddOperator<bool, bool, bool>("||", Expression.Or, priority);
             priority++;
-            AddOperator<bool, bool, bool>("&&", LogicalAnd, priority);
+            AddOperator<bool, bool, bool>("&&", Expression.And, priority);
             priority++;
-            AddOperator<object, object, bool>("==", EqualsTo, priority);
-            AddOperator<object, object, bool>("!=", NotEqualsTo, priority);
+            AddOperator<object, object, bool>("==", Expression.Equal, priority);
+            AddOperator<object, object, bool>("!=", Expression.NotEqual, priority);
             priority++;
-            AddOperator<float, float, bool>("<", LessThan, priority);
-            AddOperator<float, float, bool>(">", GreaterThan, priority);
-            AddOperator<float, float, bool>("<=", LessThanOrEqualTo, priority);
-            AddOperator<float, float, bool>(">=", GreaterThanOrEqualTo, priority);
+            AddOperator<float, float, bool>("<", Expression.LessThan, priority);
+            AddOperator<float, float, bool>(">", Expression.GreaterThan, priority);
+            AddOperator<float, float, bool>("<=", Expression.LessThanOrEqual, priority);
+            AddOperator<float, float, bool>(">=", Expression.GreaterThanOrEqual, priority);
             priority++;
-            AddOperator<float, float, float>("+", Addition, priority);
-            AddOperator<float, float, float>("-", Subtraction, priority);
+            AddOperator<float, float, float>("+", Expression.Add, priority);
+            AddOperator<float, float, float>("-", Expression.Subtract, priority);
             priority++;
-            AddOperator<float, float, float>("*", Multiplication, priority);
-            AddOperator<float, float, float>("/", Division, priority);
+            AddOperator<float, float, float>("*", Expression.Multiply, priority);
+            AddOperator<float, float, float>("/", Expression.Divide, priority);
         }
 
-        public Value Evaluate(Value a, Value b, Token token, CommandLine commandLine)
+        public Value Evaluate(Expression lValue, Expression rValue, Token token)
         {
-            if (!CommandLine.EnsureType(a, ArgumentType1) || !CommandLine.EnsureType(b, ArgumentType2))
-            {
-                var format = "Operator {0} expects {1} and {2} got {3} and {4}";
-                var message = String.Format(format, Name, ArgumentType1.Name, ArgumentType2.Name, a.Type.Name, b.Type.Name);
-                throw new TokenException(message, token);
-            }
- 
-            if (commandLine.FakeExecution)
-            {
-                return new Value(ResultType, null, token);
-            }
-            else
-            {
-                return new Value(ResultType, Handler(a.Get(), b.Get()), token);
-            }
+            TypeCache.Cast(ref lValue, ref rValue);
+            return new Value(ResultType, Handler(lValue, rValue), token);
         }
 
         private Operator()
@@ -81,66 +68,5 @@ namespace DarkCrystal.CommandLine
             @operator.ResultType = typeof(ResultT);
             Operators[name] = @operator;
         }
-
-        private static object LogicalOr(object a, object b)
-        {
-            return (bool)a || (bool)b;
-        }
-
-        private static object LogicalAnd(object a, object b)
-        {
-            return (bool)a && (bool)b;
-        }
-
-        private static object EqualsTo(object a, object b)
-        {
-            return Object.Equals(a, b);
-        }
-
-        private static object NotEqualsTo(object a, object b)
-        {
-            return !Object.Equals(a, b);
-        }
-
-        private static object LessThan(object a, object b)
-        {
-            return (float)a < (float)b;
-        }
-        
-        private static object GreaterThan(object a, object b)
-        {
-            return (float)a > (float)b;
-        }
-        
-        private static object LessThanOrEqualTo(object a, object b)
-        {
-            return (float)a <= (float)b;
-        }
-        
-        private static object GreaterThanOrEqualTo(object a, object b)
-        {
-            return (float)a >= (float)b;
-        }
-
-        private static object Addition(object a, object b)
-        {
-            return (float)a + (float)b;
-        }
-
-        private static object Subtraction(object a, object b)
-        {
-            return (float)a - (float)b;
-        }
-
-        private static object Multiplication(object a, object b)
-        {
-            return (float)a * (float)b;
-        }
-
-        private static object Division(object a, object b)
-        {
-            return (float)a / (float)b;
-        }
-
     }
 }

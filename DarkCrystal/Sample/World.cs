@@ -10,7 +10,7 @@ namespace DarkCrystal.Sample
     public static class World
     {
         public static Character Player = new Character("Player", 100);
-        private static Character[] Enemies;
+        public static Character[] Enemies;
         
         static World()
         {
@@ -20,11 +20,6 @@ namespace DarkCrystal.Sample
                 new Character("Enemy2", 66),
                 new Character("Enemy3", 25)
             };
-        }
-
-        public static Character GetEnemy(int index)
-        {
-            return Enemies[index];
         }
     }
 }

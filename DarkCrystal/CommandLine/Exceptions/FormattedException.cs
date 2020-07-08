@@ -8,8 +8,8 @@ namespace DarkCrystal.CommandLine
 {
     public class FormattedException : Exception
     {
-        public FormattedException(string message, string line, Token token)
-            : base(GetMessage(message, line, token))
+        public FormattedException(string message, string line, Token token, Exception innerException = null)
+            : base(GetMessage(message, line, token), innerException)
         {
         }
 

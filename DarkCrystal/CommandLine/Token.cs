@@ -26,6 +26,7 @@ namespace DarkCrystal.CommandLine
                 case TokenType.Comma:
                 case TokenType.ClosedBracket:
                 case TokenType.EndOfLine:
+                case TokenType.ClosedAccessorBracket:
                     return true;
 
                 default:

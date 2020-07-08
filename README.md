@@ -5,13 +5,13 @@ Command line with autocomplete for C# or Unity projects
 Proud fork of DarkCrystal.DarkLine, originally placed in
 https://github.com/Alprog/DarkLine/tree/master
 
-Mainly used with Unity3D, but core code has no limitation to use it outside.
+Mainly used with Unity3D, but core code has no dependicied from Unity libraries.
 
 ## Origin Features
 
-* Execute void functions return values
+* Execute void functions, return values
 * Binding typenames, enums and values
-* Access to all class fields, properties and methods
+* Access to all public class fields, properties and methods
 * Autocomplete helpers
 * Validation by syntax errors and specified return type 
 * Math and Boolean operations, brackets
@@ -23,7 +23,7 @@ Mainly used with Unity3D, but core code has no limitation to use it outside.
 * Namespace binding
 * [] operator access (for example, array/list single index access)
 * Extension methods access
-* Deduceable generic methods access
+* Deducible generic methods access
 * Easy type converting
 
 ## Arguments
